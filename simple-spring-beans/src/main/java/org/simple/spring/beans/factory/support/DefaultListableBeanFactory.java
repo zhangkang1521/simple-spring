@@ -3,6 +3,8 @@ package org.simple.spring.beans.factory.support;
 import org.apache.commons.beanutils.BeanUtils;
 import org.simple.spring.beans.PropertyValue;
 import org.simple.spring.beans.factory.BeanFactory;
+import org.simple.spring.beans.factory.BeanFactoryAware;
+import org.simple.spring.beans.factory.InitializingBean;
 import org.simple.spring.beans.factory.config.BeanDefinition;
 import org.simple.spring.beans.factory.config.RuntimeBeanReference;
 import org.simple.spring.beans.factory.config.TypedStringValue;
@@ -107,12 +109,12 @@ public class DefaultListableBeanFactory implements BeanFactory {
 	 */
 	private Object initializeBean(String name, Object bean, BeanDefinition beanDefinition) {
 		log.info("初始化bean {}", name);
-//		invokeAwareMethod(name, bean);
+		invokeAwareMethod(bean);
 		Object wrappedBean = bean;
 		// 前置处理
 		//wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, name);
 		// 初始化方法
-//		invokeInitMethod(wrappedBean, name);
+		invokeInitMethod(wrappedBean);
 		// 后置处理，可能返回bean的代理
 		//wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, name);
 		return wrappedBean;
@@ -142,19 +144,19 @@ public class DefaultListableBeanFactory implements BeanFactory {
 //		return result;
 //	}
 
-//	private void invokeInitMethod(Object bean, String name) {
-//		if (bean instanceof InitializingBean) {
-//			((InitializingBean) bean).afterPropertiesSet();
-//		}
-//	}
-//
-//	private void invokeAwareMethod(String name, Object bean) {
-//		if (bean instanceof BeanFactoryAware) {
-//			((BeanFactoryAware) bean).setBeanFactory(this);
-//		}
-//	}
+	private void invokeInitMethod(Object bean) {
+		if (bean instanceof InitializingBean) {
+			((InitializingBean) bean).afterPropertiesSet();
+		}
+		// TODO  xml中配置的init-method
+	}
 
-
+	private void invokeAwareMethod(Object bean) {
+		if (bean instanceof BeanFactoryAware) {
+			((BeanFactoryAware) bean).setBeanFactory(this);
+		}
+		// TODO 其他aware接口
+	}
 
 
 	private void applyPropertyValues(String beanName, Object bean, List<PropertyValue> propertyValueList) {

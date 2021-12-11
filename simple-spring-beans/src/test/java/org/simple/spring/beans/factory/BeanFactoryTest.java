@@ -38,4 +38,12 @@ public class BeanFactoryTest {
 		Assert.assertNotNull(user.getOrder());
 		Assert.assertEquals(200, (int)user.getOrder().getId());
 	}
+
+	@Test
+	public void aware() {
+		// 验证getBean
+		BeanFactory beanFactory = new XmlBeanFactory("beanFactory-1.xml");
+		User user = (User)beanFactory.getBean("user");
+		Assert.assertTrue(beanFactory == user.getBeanFactory());
+	}
 }

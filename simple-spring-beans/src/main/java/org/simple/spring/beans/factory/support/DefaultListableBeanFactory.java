@@ -1,11 +1,13 @@
 package org.simple.spring.beans.factory.support;
 
 import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.simple.spring.beans.PropertyValue;
 import org.simple.spring.beans.factory.BeanFactory;
 import org.simple.spring.beans.factory.BeanFactoryAware;
 import org.simple.spring.beans.factory.InitializingBean;
 import org.simple.spring.beans.factory.config.BeanDefinition;
+import org.simple.spring.beans.factory.config.BeanPostProcessor;
 import org.simple.spring.beans.factory.config.RuntimeBeanReference;
 import org.simple.spring.beans.factory.config.TypedStringValue;
 import org.simple.spring.util.SpringBeanUtils;
@@ -13,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +35,8 @@ public class DefaultListableBeanFactory implements BeanFactory {
 	/** 单例bean */
 	private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>();
 
+	/** bean后置处理器 */
+	private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
 
 	public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition) {
 		log.info("注册BeanDefinition {}", beanName);
@@ -112,37 +117,37 @@ public class DefaultListableBeanFactory implements BeanFactory {
 		invokeAwareMethod(bean);
 		Object wrappedBean = bean;
 		// 前置处理
-		//wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, name);
+		wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, name);
 		// 初始化方法
 		invokeInitMethod(wrappedBean);
 		// 后置处理，可能返回bean的代理
-		//wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, name);
+		wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, name);
 		return wrappedBean;
 	}
 
 
 
-//	private Object applyBeanPostProcessorsBeforeInitialization(Object bean, String beanName) {
-//		Object result = bean;
-//		for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
-//			result = beanPostProcessor.postProcessBeforeInitialization(result, beanName);
-//			if (result == null) {
-//				return result;
-//			}
-//		}
-//		return result;
-//	}
+	private Object applyBeanPostProcessorsBeforeInitialization(Object bean, String beanName) {
+		Object result = bean;
+		for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+			result = beanPostProcessor.postProcessBeforeInitialization(result, beanName);
+			if (result == null) {
+				return result;
+			}
+		}
+		return result;
+	}
 
-//	private Object applyBeanPostProcessorsAfterInitialization(Object bean, String name) {
-//		Object result = bean;
-//		for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
-//			result = beanPostProcessor.postProcessAfterInitialization(result, name);
-//			if (result == null) {
-//				return result;
-//			}
-//		}
-//		return result;
-//	}
+	private Object applyBeanPostProcessorsAfterInitialization(Object bean, String name) {
+		Object result = bean;
+		for (BeanPostProcessor beanPostProcessor : getBeanPostProcessors()) {
+			result = beanPostProcessor.postProcessAfterInitialization(result, name);
+			if (result == null) {
+				return result;
+			}
+		}
+		return result;
+	}
 
 	private void invokeInitMethod(Object bean) {
 		if (bean instanceof InitializingBean) {
@@ -191,8 +196,49 @@ public class DefaultListableBeanFactory implements BeanFactory {
 	}
 
 
+	public <T> T getBean(Class<T> requiredType) {
+		List<String> beanNames = getBeanNamesForType(requiredType);
+		if (CollectionUtils.isEmpty(beanNames)) {
+			throw new RuntimeException("没有找到bean，requiredType:" + requiredType);
+		}
+		if (beanNames.size() > 1) {
+			throw new RuntimeException("找到多个bean错误，requiredType: " + requiredType);
+		}
+		return (T)getBean(beanNames.get(0));
+	}
 
+	public List<String> getBeanNamesForType(Class<?> type) {
+		List<String> beanNames = new ArrayList<>();
+		this.beanDefinitionMap.forEach((beanName, beanDefinition) -> {
+			Class<?> clz = beanDefinition.resolveBeanClass();
+//			if (FactoryBean.class.isAssignableFrom(clz)) {
+//				// 存在死循环 getBean("userDao") -> getBean("sqlSessionFactory") -> getBeanNamesForType(DataSource) -> getBean("&userDao") -> getBean("sqlSessionFactory")
+//				FactoryBean factoryBean = (FactoryBean) getBean(BeanFactory.FACTORY_BEAN_PREFIX + beanName);
+//				clz = factoryBean.getObjectType();
+//			}
+			if (type.isAssignableFrom(clz)) {
+				beanNames.add(beanName);
+			}
+		});
+		return beanNames;
+	}
 
+	public void addBeanPostProcessors(BeanPostProcessor beanPostProcessor) {
+		this.beanPostProcessors.add(beanPostProcessor);
+	}
 
+	/**
+	 * 初始化bean
+	 */
+	public void preInstantiateSingletons() {
+		log.info("初始化所有单例bean");
+		for (String beanName : beanDefinitionMap.keySet()) {
+			getBean(beanName);
+		}
+	}
+
+	private List<BeanPostProcessor> getBeanPostProcessors() {
+		return beanPostProcessors;
+	}
 
 }

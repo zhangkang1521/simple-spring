@@ -12,6 +12,7 @@
     <modules>
         <module>simple-spring-core</module>
         <module>simple-spring-beans</module>
+        <module>simple-spring-context</module>
     </modules>
 
 
